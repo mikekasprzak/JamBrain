@@ -9,7 +9,8 @@ require_once __DIR__."/".SHRUB_PATH."/core/db_sphinx.php";
 api_Exec([
 ["search", API_GET, API_CHARGE_1, function(&$RESPONSE) {
 	// q=what (like google)
-	
+	$query = $_GET['q'];            // q=what (like google)
+
 	$RESPONSE['test'] = true;
 }],
 ]);
