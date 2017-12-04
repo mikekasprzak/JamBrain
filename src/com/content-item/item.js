@@ -275,12 +275,12 @@ export default class ContentItem extends Component {
 			}
 
 			{
-				let Old = node.meta[Base+'-tag'] ? parseInt(node.meta[Base+'-tag']) : 0;
+				let Old = (node.meta[Base+'-tag'] && node.meta[Base+'-tag']) ? parseInt(node.meta[Base+'-tag'][0]) : 0;
 				let New = parseInt(this.state.linkTags[i]);
 
 				if ( Old != New ) {
 					TagData[Base+'-tag'] = this.state.linkTags[i];
-					this.props.node.meta[Base+'-tag'] = [TagData[Base+'-tag']];
+					this.props.node.meta[Base+'-tag'][0] = TagData[Base+'-tag'];
 					Changes++;
 				}
 			}

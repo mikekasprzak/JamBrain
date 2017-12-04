@@ -19,7 +19,7 @@ export default class ContentCommonBodyField extends Component {
 			'items': null,			// raw tag results
 			'itemlist': null,		// pairs (index, name) for the drop-down
 			'indexes': null,		// lookup table that takes ids and converts them in to dropdown indexes
-			'tag': props.tag ? props.tag : 0,
+			'tag': null,
 		};
 
 		this.onModifyTag = this.onModifyTag.bind(this);
@@ -35,14 +35,14 @@ export default class ContentCommonBodyField extends Component {
 						'items': r.tag,
 						'itemlist': [],
 						'indexes': {},
-						'tag': 0,
+						'tag': null,
 					};
 					r.tag.forEach(item => {
 						NewState.indexes[item.id] = NewState.itemlist.length;
 						NewState.itemlist.push([item.id, item.name]);
 					});
 
-					NewState.tag = NewState.itemlist[0][0];
+					NewState.tag = this.props.tag ? this.props.tag : NewState.itemlist[0][0];
 
 					this.setState(NewState);
 				}
