@@ -21,6 +21,8 @@ export default {
 
 	AddMeta,
 	RemoveMeta,
+	AddTag,
+	RemoveTag,
 	AddLink,
 	RemoveLink,
 
@@ -315,6 +317,7 @@ export function Transform( id, type, subtype, subsubtype ) {
 		});
 }
 
+// Metas write a, key, value
 export function AddMeta( id, data ) {
 	return Fetch.Post(API_ENDPOINT+'/vx/node/meta/add/'+id, data)
 		.then( r => {
@@ -329,6 +332,24 @@ export function RemoveMeta( id, data ) {
 			return r;
 		});
 }
+
+// Tags write a, b=value, key
+export function AddTag( id, data ) {
+	return Fetch.Post(API_ENDPOINT+'/vx/node/tag/add/'+id, data)
+		.then( r => {
+			InvalidateNodeCache(id);
+			return r;
+		});
+}
+export function RemoveTag( id, data ) {
+	return Fetch.Post(API_ENDPOINT+'/vx/node/tag/remove/'+id, data)
+		.then( r => {
+			InvalidateNodeCache(id);
+			return r;
+		});
+}
+
+// Links write a, b, key, value
 export function AddLink( a, b, data ) {
 	return Fetch.Post(API_ENDPOINT+'/vx/node/link/add/'+a+'/'+b, data)
 		.then( r => {

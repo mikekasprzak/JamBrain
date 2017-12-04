@@ -277,7 +277,8 @@ switch ( $action ) {
 
 			$tags = null;
 			if ( isset($_GET['tags']) ) {
-				$tags = array_map("coreSlugify_Name", explode('+', $_GET['tags']));
+				//$tags = array_map("coreSlugify_Name", explode('+', $_GET['tags']));
+				$tags = array_map("intval", explode('+', $_GET['tags']));
 				$RESPONSE['tags'] = $tags;
 			}
 
@@ -399,7 +400,7 @@ switch ( $action ) {
 					$RESPONSE['limit'] = 50;
 			}
 
-			$RESPONSE['feed'] = nodeFeed_GetByMethod( $methods, $root, $types, $subtypes, $subsubtypes, $score_op, $RESPONSE['limit'], $RESPONSE['offset'] );
+			$RESPONSE['feed'] = nodeFeed_GetByMethod( $methods, $root, $types, $subtypes, $subsubtypes, $tags, $score_op, $RESPONSE['limit'], $RESPONSE['offset'] );
 
 //			$RESPONSE['feed'] = nodeFeed_GetByNodeMethodType( $root, $methods, $types, $subtypes, $subsubtypes, null, $RESPONSE['limit'], $RESPONSE['offset'] );
 		}
@@ -1043,6 +1044,7 @@ switch ( $action ) {
 		};
 		break; // case 'star': //node/star
 
+	case 'tag':
 	case 'meta':
 		$old_action = $action;
 		$action = json_ArgShift();
@@ -1110,13 +1112,29 @@ switch ( $action ) {
 							else
 								json_EmitFatalError_BadRequest("Internal error while applying '$key' metadata in '".$node['type']."'", $RESPONSE);
 
-							if ( $action == 'add' )
-								$changed = nodeMeta_Add($node_id, 0, $scope, $key, $v);
-							else if ( $action == 'remove' )
-								$changed = nodeMeta_Remove($node_id, 0, $scope, $key, $v);
+							if ( $old_action == 'meta' ) {
+								if ( $action == 'add' )
+									$changed = nodeMeta_Add($node_id, 0, $scope, $key, $v);
+								else if ( $action == 'remove' )
+									$changed = nodeMeta_Remove($node_id, 0, $scope, $key, $v);
 
-							if ( $changed )
-								$RESPONSE['changed'][$key] = $v;
+								if ( $changed )
+									$RESPONSE['changed'][$key] = $v;
+							}
+							// tags are exactly like metas, but the data is written to 'b' instead
+							else if ( $old_action == 'tag' ) {
+								$v = intval($v);
+
+								if ( $action == 'add' )
+									$changed = nodeMeta_Add($node_id, $v, $scope, $key, null);
+								else if ( $action == 'remove' )
+									$changed = nodeMeta_Remove($node_id, $v, $scope, $key, null);
+
+								if ( $changed ) {
+									$RESPONSE['changed'][$key] = $v;
+									nodeCache_InvalidateById($v);
+								}
+							}
 						}
 						if ( count($RESPONSE['changed']) ) {
 							nodeCache_InvalidateById($node_id);

@@ -42,11 +42,12 @@ export default class ContentItem extends Component {
 		};
 
 		for ( let i = 0; i < 9; i++ ) {
-			this.state.linkUrls[i] = node.meta['link-0'+(i+1)] ? node.meta['link-0'+(i+1)] : '';
-			this.state.linkTags[i] = node.meta['link-0'+(i+1)+'-tag'] ? parseInt(node.meta['link-0'+(i+1)+'-tag']) : 0;
-			this.state.linkNames[i] = node.meta['link-0'+(i+1)+'-name'] ? node.meta['link-0'+(i+1)+'-name'] : '';
+			let Base = 'link-0'+(i+1);
+			this.state.linkUrls[i] = node.meta[Base] ? node.meta[Base] : '';
+			this.state.linkTags[i] = (node.meta[Base+'-tag'] && node.meta[Base+'-tag'].length) ? parseInt(node.meta[Base+'-tag'][0]) : 0;
+			this.state.linkNames[i] = node.meta[Base+'-name'] ? node.meta[Base+'-name'] : '';
 
-			if ( this.state.linkUrls[i] && i+1 > this.state.linksShown ) {
+			if ( this.state.linkUrls[i] && ((i+1) > this.state.linksShown) ) {
 				this.state.linksShown = i+1;
 			}
 		}
@@ -256,6 +257,7 @@ export default class ContentItem extends Component {
 			return null;
 
 		let Data = {};
+		let TagData = {};
 		let Changes = 0;
 		for ( let i = 0; i < this.state.linkUrls.length; i++ ) {
 			let Base = 'link-0'+(i+1);
@@ -277,8 +279,8 @@ export default class ContentItem extends Component {
 				let New = parseInt(this.state.linkTags[i]);
 
 				if ( Old != New ) {
-					Data[Base+'-tag'] = this.state.linkTags[i];
-					this.props.node.meta[Base+'-tag'] = Data[Base+'-tag'];
+					TagData[Base+'-tag'] = this.state.linkTags[i];
+					this.props.node.meta[Base+'-tag'] = [TagData[Base+'-tag']];
 					Changes++;
 				}
 			}
@@ -295,10 +297,19 @@ export default class ContentItem extends Component {
 			}
 		}
 
-//		this.setState({});
-//		console.log(Data);
+		if ( Data.length ) {
+			return $Node.AddMeta(node.id, Data)
+				.then(r => {
+					if ( TagData.length ) {
+						return $Node.AddTag(node.id, TagData);
+					}
+				});
+		}
+		else if ( TagData.length ) {
+			return $Node.AddTag(node.id, TagData);
+		}
 
-		return $Node.AddMeta(node.id, Data);
+		return false;
 	}
 
 	// Generates JSX for the links, depending on whether the page is editing or viewing
