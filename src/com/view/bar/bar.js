@@ -96,29 +96,29 @@ export default class ViewBar extends Component {
 	}
 
 	renderRight( user, featured ) {
-		var Search = null;
-//		var Search = (
+		let Search = (
 //			<ButtonBase class="-icon" onclick={e => { console.log('search'); window.location.hash = "#search"; }}>
-//				<SVGIcon baseline>search</SVGIcon>
-//			</ButtonBase>
-//		);
+			<ButtonLink class="-icon" href="/search">
+				<SVGIcon baseline>search</SVGIcon>
+			</ButtonLink>
+		);
 
-		var ShowCalendar = (
+		let ShowCalendar = (
 			<ButtonBase class="-button if-no-sidebar-block" onclick={e => { console.log('calendar'); window.location.hash = "#cal"; }}>
 				<SVGIcon baseline>calendar</SVGIcon>
 				<div class="if-sidebar-block">Schedule</div>
 			</ButtonBase>
 		);
 
-		var ShowJoin = null;
-		var ShowMyGame = null;
-		var NewPost = null;
+		let ShowJoin = null;
+		let ShowMyGame = null;
+		let NewPost = null;
 		let Notification = null;
-		var ShowUser = null;
-		var Register = null;
-		var Login = null;
-		var GoSecure = null;
-		var ShowSpinner = null;
+		let ShowUser = null;
+		let Register = null;
+		let Login = null;
+		let GoSecure = null;
+		let ShowSpinner = null;
 		let ShowNotifications = null;
 
 		// Disallow insecure login
@@ -223,10 +223,10 @@ export default class ViewBar extends Component {
 			return (
 				<div class="-right">
 					{ShowJoin}
+					{Search}
 					{ShowMyGame}
 					{NewPost}
 					{ShowCalendar}
-					{Search}
 					{Notification}
 					{ShowNotifications}
 					{ShowUser}
