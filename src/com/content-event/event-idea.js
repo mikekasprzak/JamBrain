@@ -172,7 +172,7 @@ export default class ContentEventIdea extends Component {
 				...id
 			}))
 			.sort((a, b) => a.score - b.score);
-			this.setState({'similarThemes': scores.slice(0, 4).filter(t => t.score < 2.5)});
+			this.setState({'similarThemes': scores.slice(0, 4).filter(t => (t.score < 2.5))});
 	}
 
 	onKeyDown( e ) {
@@ -193,10 +193,12 @@ export default class ContentEventIdea extends Component {
 		//console.log('remove:', id );
 		this.setState({'error': null});
 		if ( id ) {
-			$ThemeIdea.Remove(this.props.node.id, id)
+			return $ThemeIdea.Remove(this.props.node.id, id)
 			.then(r => {
 				//console.log(r.ideas);
 				this.setState({'ideas': r.ideas, 'enableSubmit': canHaveMoreIdeas(r.ideas, false, this.state.maxIdeas)});
+
+				return r;
 			})
 			.catch(err => {
 				this.setState({'error': "Error processing the request. Make sure you are still logged in."});
@@ -205,6 +207,8 @@ export default class ContentEventIdea extends Component {
 		else {
 			this.setState({'error': "Unexpected error."});
 		}
+
+		return null;
 	}
 
 	checkDuplicateIdea( idea ) {
@@ -237,24 +241,30 @@ export default class ContentEventIdea extends Component {
 				'processingIdea': idea,
 				'error': null,
 			});
-			$ThemeIdea.Add(this.props.node.id, idea)
+
+			return $ThemeIdea.Add(this.props.node.id, idea)
 			.then(r => {
 				//console.log('r', r);
+
 				this.setState({
 					'ideas': r.ideas,
 					'idea': (r.status === 201) ? '' : idea,
 					'enableSubmit': canHaveMoreIdeas(r.ideas, false, this.state.maxIdeas),
 					'processingIdea': null,
-					'everyonesIdeas': everyonesIdeas.concat([idea]),
+					'everyonesIdeas': this.state.everyonesIdeas ? this.state.everyonesIdeas.concat([idea]) : [idea]
 				});
+
+				return r;
 			})
 			.catch(err => {
-				this.setState({'error': "Error processing the request. Make sure you are still logged in.", 'processingIdea': null});
+				this.setState({'error': "Error processing the request. Make sure you are still logged in."+err, 'processingIdea': null});
 			});
 		}
 		else {
 			this.setState({'error': "Suggestion is too " + (idea.length == 0 ? "short." : "long.")});
 		}
+
+		return null;
 	}
 
 	renderIdea( id ) {
