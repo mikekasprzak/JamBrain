@@ -1,4 +1,4 @@
-import { h, Component } 				from 'preact/preact';
+import {h, Component} 				from 'preact/preact';
 import NavSpinner						from 'com/nav-spinner/spinner';
 import NavLink 							from 'com/nav-link/link';
 import SVGIcon 							from 'com/svg-icon/icon';
@@ -17,8 +17,6 @@ import ContentCommonBody				from 'com/content-common/common-body';
 import ContentCommonNav					from 'com/content-common/common-nav';
 import ContentCommonNavButton			from 'com/content-common/common-nav-button';
 import ContentCommonBodyTitle			from 'com/content-common/common-body-title';
-import ContentCommonBodyMarkup			from 'com/content-common/common-body-markup';
-
 
 import ContentSimple					from 'com/content-simple/simple';
 
@@ -85,6 +83,16 @@ export default class ContentEvent extends Component {
 			ShowGame = <ContentCommonNavButton href={path+'/games'} class={Class}><SVGIcon>gamepad</SVGIcon><div class="if-sidebar-inline">Games</div></ContentCommonNavButton>;
 		}
 
+		let ShowMyGrades = null;
+		//TODO: How to know if we're grading or have graded?
+		if ( true ) {
+			if ( extra && extra.length > 0 && extra[0] == "mygrades") {
+				Class = "-selected";
+			}
+
+			ShowMyGrades = <ContentCommonNavButton href={path+'/mygrades'} class={Class}><SVGIcon>star-half</SVGIcon><div class="if-sidebar-inline">My Grades</div></ContentCommonNavButton>;
+		}
+
 //		if ( extra && extra.length ) {
 //			Class = "-disabled";
 //		}
@@ -96,8 +104,8 @@ export default class ContentEvent extends Component {
             }
 
 			// NOTE: THIS IS WRONG! We should be asking the event node (i.e. this) for `what`. Alas, with 1 event we can cheat
-			if ( featured && featured.what && featured.what.length ) {
-				var FeaturedGame = featured.what[featured.what.length-1]; // Hack
+			if ( featured && featured.what && featured.focus_id ) {
+//				var FeaturedGame = featured.what[featured.focus_id]; // Hack
 //				ShowGame =
 
 			}
@@ -170,20 +178,23 @@ export default class ContentEvent extends Component {
 			);
 		}
 
-		props.minmax = true;
+		//props.minmax = true;
 		if ( !IsHome )
 			props.minimized = true;
 
 		return (
 			<ContentSimple {...props}>
 				<ContentCommonNav>
-					{ShowHome}
                     {ShowJoin}
-					{ShowGame}
-					{ShowFeed}
-					{ShowTheme}
 				</ContentCommonNav>
 			</ContentSimple>
 		);
 	}
+
+//					{ShowHome}
+//					{ShowGame}
+//					{ShowMyGrades}
+//					{ShowFeed}
+//					{ShowTheme}
+
 }

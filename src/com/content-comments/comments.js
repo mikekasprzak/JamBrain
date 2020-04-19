@@ -1,13 +1,13 @@
-import { h, Component } 				from 'preact/preact';
+import {h, Component}	 				from 'preact/preact';
 
 import NavSpinner						from 'com/nav-spinner/spinner';
 
 import ContentCommentsComment			from 'comments-comment';
 
-import $Note							from '../../shrub/js/note/note';
-import $Node							from '../../shrub/js/node/node';
-import $NoteLove						from '../../shrub/js/note/note_love';
-import $Notification					from '../../shrub/js/notification/notification';
+import $Comment							from 'shrub/js/comment/comment';
+import $Node							from 'shrub/js/node/node';
+import $CommentLove						from 'shrub/js/comment/comment_love';
+import $Notification					from 'shrub/js/notification/notification';
 
 export default class ContentComments extends Component {
 	constructor( props ) {
@@ -24,7 +24,7 @@ export default class ContentComments extends Component {
 		};
 
 		this.onPublish = this.onPublish.bind(this);
-		this.onSubscribe = this.onSubscribe.bind(this);
+		this.onToggleSubscribe = this.onToggleSubscribe.bind(this);
 	}
 
 	componentWillMount() {
@@ -48,11 +48,11 @@ export default class ContentComments extends Component {
 			$Notification.GetSubscription( node.id )
 			.then(r => {
 				// Determine whether user is subscribed to the thread explicitly
-				this.setState({'subscribed': r['subscribed']});
+				if (r.status == 200) this.setState({'subscribed': r.subscribed});
 			});
 		}
 
-		$Note.Get( node.id )
+		$Comment.GetByNode(node.id)
 		.then(r => {
 			// Determine if current user is one of the authors of this node
 			let isauthor = false;
@@ -91,7 +91,7 @@ export default class ContentComments extends Component {
 				this.setState({'newcomment': this.genComment()});
 			});
 
-			$NoteLove.GetMy(node.id)
+			$CommentLove.GetMy(node.id)
 			.then(r => {
 					this.setState({"lovedComments": r["my-love"]});
 
@@ -117,7 +117,7 @@ export default class ContentComments extends Component {
 				};
 			}
 			else if ( comments[idx].parent && tree[comments[idx].parent] ) {
-				if (!tree[comments[idx].parent].child) {
+				if ( !tree[comments[idx].parent].child ) {
 					tree[comments[idx].parent].child = {};
 				}
 
@@ -134,8 +134,8 @@ export default class ContentComments extends Component {
 	}
 
 	getAuthors() {
-		var user = this.props.user;
-		var comments = this.state.comments;
+		const {user, node} = this.props;
+		const comments = this.state.comments;
 
 		if ( comments ) {
 			var Authors = [];
@@ -149,43 +149,57 @@ export default class ContentComments extends Component {
 			if ( user && user.id ) {
 				Authors.push(user.id);
 			}
+
+			// Add authors from node
+			if ( node.meta && node.meta.authors ) {
+				node.meta.authors.forEach((author) => Authors.push(author));
+			}
+			else if (node) {
+				Authors.push(node.author);
+			}
+
 			// http://stackoverflow.com/a/23282067/5678759
 			// Remove Duplicates
-			Authors = Authors.filter(function(item, i, ar){ return ar.indexOf(item) === i; });
+			// Skip anonymous comments (user 0)
+			Authors = Authors.filter((item, i, ar) => (ar.indexOf(item) === i) && (item > 0));
 
 			// Fetch authors
 
 			return $Node.GetKeyed( Authors )
 			.then(r => {
-				this.setState({ 'authors': r.node });
+				this.setState({'authors': r.node});
 			})
 			.catch(err => {
-				this.setState({ 'error': err });
+				this.setState({'error': err});
 			});
 		}
 	}
 
 	renderComments( tree, indent = 0 ) {
-		var user = this.props.user;
-		var authors = this.state.authors;
+		const {user, node} = this.props;
+		const {authors, lovedComments} = this.state;
+		const userId = user && user.id !== 0 && user.id;
+		const userSlug = userId && `@${user.slug}`;
 
-		var lovedComments = this.state.lovedComments;
-		var actualLove = [];
+		const actualLove = [];
 		for ( var item in lovedComments ) {
 			actualLove.push(lovedComments[item]['note']);
 		}
 
-		var ret = [];
+		const ret = [];
 
 		for ( var item in tree ) {
 			var comment = tree[item].node;
-			comment.loved = actualLove.indexOf(comment.id) !== -1 ? true : false;
+			comment.loved = (actualLove.indexOf(comment.id) !== -1) ? true : false;
 			var author = authors[comment.author];
-
+			const isMyComment = comment.author != null && comment.author === userId;
+			const isMention = !isMyComment && userSlug && comment.body.indexOf(userSlug) > -1;
+			const isNodeAuthor = !isMention && node_IsAuthor(node, {'id': comment.author});
 			if ( tree[item].child ) {
-				ret.push(<ContentCommentsComment user={user} comment={comment} author={author} indent={indent}><div class="-indent">{this.renderComments(tree[item].child, indent+1)}</div></ContentCommentsComment>);
-			} else {
-				ret.push(<ContentCommentsComment user={user} comment={comment} author={author} indent={indent}/>);
+				ret.push(<ContentCommentsComment user={user} node={node} comment={comment} author={author} indent={indent} isMyComment={isMyComment} isNodeAuthor={isNodeAuthor} isMention={isMention}><div class="-indent">{this.renderComments(tree[item].child, indent+1)}</div></ContentCommentsComment>);
+			}
+			else {
+				ret.push(<ContentCommentsComment user={user} node={node} comment={comment} author={author} indent={indent} isMyComment={isMyComment} isNodeAuthor={isNodeAuthor} isMention={isMention} />);
 			}
 		}
 
@@ -193,26 +207,23 @@ export default class ContentComments extends Component {
 	}
 
 	renderPostNew() {
-		const user = this.props.user;
-		const authors = this.state.authors;
-		const comment = this.state.newcomment;
-		const error = this.state.error;
+		const {user, node} = this.props;
+		const {authors, error, "newcomment": comment, subscribed} = this.state;
 		const author = authors[comment.author];
 		const allowAnonymous = parseInt(this.props.node.meta['allow-anonymous-comments']);
 
-		// We can subscribe if we haven't subscribed and we don't have a comment in this thread, and we're not an author. Otherwise we can unsubscribe.
-		let canSubscribe = (this.state.subscribed === null) ? !( this.state.hascomment || this.state.isauthor ) : !this.state.subscribed;
-
-		return <div class="-new-comment"><ContentCommentsComment user={user} comment={comment} author={author} indent={0} editing publish onpublish={this.onPublish} nolove allowAnonymous={allowAnonymous} error={error} cansubscribe={canSubscribe} onsubscribe={this.onSubscribe} /></div>;
+		return <div class="-new-comment"><ContentCommentsComment user={user} node={node} comment={comment} author={author} indent={0} editing publish onpublish={this.onPublish} nolove allowAnonymous={allowAnonymous} error={error} subscribed={subscribed} onsubscribe={this.onToggleSubscribe} authors={authors}/></div>;
 	}
 
 	onPublish( e, publishAnon ) {
-		const node = this.props.node;
-		const newcomment = this.state.newcomment;
-		this.setState({'error': null });
+		const {node} = this.props;
+		const {newcomment, subscribed} = this.state;
 
-		$Note.Add( newcomment.parent, newcomment.node, newcomment.body, null, publishAnon )
+		this.setState({'error': null});
+
+		$Comment.Add(newcomment.parent, newcomment.node, newcomment.body, null, publishAnon)
 		.then(r => {
+			if (subscribed == null) this.onToggleSubscribe();
 			if ( r.note ) {
 				var Now = new Date();
 				var comment = Object.assign({
@@ -240,17 +251,24 @@ export default class ContentComments extends Component {
 		});
 	}
 
-	onSubscribe( e, subscribe ) {
+	onToggleSubscribe() {
+		const {subscribed} = this.state;
 		let promise = null;
-		if ( subscribe ) {
-			promise = $Notification.Subscribe( this.props.node.id );
+		if ( subscribed ) {
+			promise = $Notification.Unsubscribe( this.props.node.id );
 		}
 		else {
-			promise = $Notification.Unsubscribe( this.props.node.id );
+			promise = $Notification.Subscribe( this.props.node.id );
 		}
 
 		promise.then(r => {
-			this.setState({'subscribed': subscribe});
+			if (r.status == 200) {
+					this.setState({'subscribed': r.subscribed});
+			}
+			else
+			{
+					this.setState({'error': 'Could update subscription status'});
+			}
 		});
 	}
 
@@ -274,7 +292,7 @@ export default class ContentComments extends Component {
 		}
 
 		return (
-			<div class={['content-base','content-common','content-comments',props['no_gap']?'-no-gap':'',props['no_header']?'-no-header':'']}>
+			<div class={cN("content-base content-common content-comments", props['no_gap'] ? '-no-gap' : '', props['no_header'] ? '-no-header' : '')}>
 				<div class="-headline">COMMENTS</div>
 				{ShowComments}
 				{ShowPostNew}

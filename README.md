@@ -4,7 +4,9 @@ This is the source code for the Ludum Dare family of websites! It's currently li
 
 https://ldjam.com/
 
-Wan't to help out? Setup Instructions are here:
+[![Build Status](https://travis-ci.org/ludumdare/ludumdare.svg?branch=master)](https://travis-ci.org/ludumdare/ludumdare)
+
+Want to help out? Setup Instructions are here:
 
 https://github.com/ludumdare/dairybox
 

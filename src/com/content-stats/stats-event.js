@@ -11,7 +11,6 @@ import ContentCommonBody				from 'com/content-common/common-body';
 import ContentCommonBodyBy				from 'com/content-common/common-body-by';
 import ContentCommonBodyTitle			from 'com/content-common/common-body-title';
 import ContentCommonBodyAvatar			from 'com/content-common/common-body-avatar';
-import ContentCommonBodyMarkup			from 'com/content-common/common-body-markup';
 
 import PieChart							from 'com/visualization/piechart/piechart';
 import BarChart							from 'com/visualization/barchart/barchart';
@@ -131,7 +130,7 @@ export default class ContentStatsEvent extends Component {
 
 					let ratings = [];
 
-					ratings.push(<div class="-gap"><span class="-title">Number of Ratings Recived (Per Game):</span></div>);
+					ratings.push(<div class="-gap"><span class="-title">Ratings Received per Entry:</span></div>);
 					let grades = [
 						stats['grade-20-plus'],
 						stats['grade-15-20'],

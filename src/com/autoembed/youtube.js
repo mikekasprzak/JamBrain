@@ -31,7 +31,7 @@ export default class YoutubeEmbed extends Component {
       return (
         <div class="embed-video -youtube">
           <div class="-video">
-            <iframe src={'https://www.youtube.com/embed/' + video_id + '?' + args.join('&')} frameborder="0" allowfullscreen></iframe>
+            <iframe src={'https://www.youtube.com/embed/' + video_id + '?' + args.join('&')} frameborder="0" allowfullscreen allow="autoplay; fullscreen"></iframe>
           </div>
         </div>
       );
@@ -45,14 +45,14 @@ export default class YoutubeEmbed extends Component {
               <SVGIcon middle>play</SVGIcon>
             </div>
             <div class="-external">
-              <a href={"//www.youtube.com/watch?v="+video_id} target="_blank" onclick={(e) => {
+              <a title="Open in new tab" href={"//www.youtube.com/watch?v="+video_id} target="_blank" rel="noopener" onclick={(e) => {
                 e.stopPropagation();
               }}>
                 <SVGIcon middle block>youtube</SVGIcon>
               </a>
             </div>
           </div>
-          <img src={yt_thumbnail_prefix + video_id + yt_thumbnail_suffix}/>
+          <img alt="Youtube video thumbnail" src={yt_thumbnail_prefix + video_id + yt_thumbnail_suffix}/>
         </div>
       </div>
     );
