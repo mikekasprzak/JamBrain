@@ -1,0 +1,63 @@
+@import 'defs.less';
+
+.ui-dropdown {
+	vertical-align: top;
+	position: relative;
+
+	&.-show {
+		& > .-button {
+			z-index: 10001;
+		}
+
+		& > .-content {
+			z-index: 10000;
+		}
+
+		& > .-click-catcher {
+			z-index: 9999;
+		}
+	}
+
+	& > .-button {
+		overflow: auto;
+		position: relative;
+
+		& > .-tick {
+			position: absolute;
+			margin: auto 0.5em;
+			top: 0;
+			bottom: 0;
+			right: 0;
+		}
+	}
+
+	& > .-content {
+		position: absolute;
+
+		white-space: nowrap;
+
+		& .-gap {
+			height: 0.5em;
+		}
+	}
+
+	& > .-click-catcher {
+		position: fixed;
+		left: 0px;
+		right: 0px;
+		top: 0px;
+		bottom: 0px;
+	}
+
+	/* Alignment */
+	&.-right {
+		& > .-content {
+			right: 0;
+		}
+	}
+	&.-left {
+		& > .-content {
+			left: 0;
+		}
+	}
+}

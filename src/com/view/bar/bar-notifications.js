@@ -10,11 +10,43 @@ import $Notification					from 'shrub/js/notification/notification';
 
 export default class DropdownNotification extends NotificationsBase {
 
+	constructor( props ) {
+		super(props);
+
+		this.state = {
+			"notifications": null,
+			"notificationIds": [],
+			"notificationsTotal": -1,
+			"count": 0,
+			"status": null,
+			"feed": [],
+			"loading": true,
+			"highestRead": -1,
+		};
+		this.hide = this.hide.bind(this);
+		this.clearNotifications = this.clearNotifications.bind(this);
+	}
+
 	componentDidMount() {
-		const showCount = 8;
-		$Notification.GetFeedAll(0, showCount ).then((r) => {
-			this.processNotificationFeed(r);
-		}).catch((e)=> console.log('[Notification error]', e));
+		this.processNotificationFeed(this.props.feed);
+		if (this.props.anythingToMark) this.markReadHighest();
+	}
+
+	hasNewNotification(feed) {
+		if (!feed) return false;
+		const oldFeed = this.props.feed && this.props.feed.feed;
+		if (!oldFeed) return true;
+		return !oldFeed.map((e, i) => e == feed[i])
+				.concat(feed.map((e, i) => e == oldFeed[i]))
+				.reduce((a, b) => a && b);
+	}
+
+	componentWillReceiveProps(nextProps) {
+		if (this.hasNewNotification(nextProps.feed && nextProps.feed.feed)) {
+			this.clearNotifications();
+			this.processNotificationFeed(nextProps.feed);
+			if (nextProps.anythingToMark) this.markReadHighest();
+		}
 	}
 
 	hide() {
@@ -24,45 +56,36 @@ export default class DropdownNotification extends NotificationsBase {
 	}
 
 	clearNotifications() {
-		this.markReadHighest();
 		if (this.props.clearCallback) {
 			this.props.clearCallback();
 		}
 	}
 
-	render( props ) {
-		const state = this.state;
-		const loading = this.isLoading();
-		let ShowSpinner = null;
+	render( props, state ) {
+		const showMax = 8;
 		let Notifications = [];
 
-		if (state.status === null) {
-			ShowSpinner = (<NavSpinner />);
-		} else if (state.status != 200) {
-			Notifications = [[null, (<div>An error occurred retrieving the notifications...</div>)]];
-		} else {
-			if (loading) {
-				ShowSpinner = (<NavSpinner />);
+		if (props.error) {
+			Notifications = [[null, <div class="-warning">Error: {props.error}</div>]];
+		}
+		else if (state.status != 200) {
+			Notifications = [[null, (<div class="-warning">An error occurred retrieving the notifications...</div>)]];
+		}
+		else {
+			if (state.loading) {
+				Notifications = [[null, <div class="-warning">Loading...</div>]];
 			}
-			Notifications = this.getNotifications();
+			Notifications = Notifications.concat(this.getNotifications(showMax, props.hideCallback));
 		}
 
-		if (ShowSpinner !== null) {
-			Notifications.push([null, ShowSpinner]);
+		if ( !state.loading && (state.count == 0) ) {
+			Notifications.push([null, <div class="-warning">You have no notifications.</div>]);
 		}
 
-		if ( !loading && (state.count == 0) ) {
-			Notifications.push([-3, (<div>You have no notifications.</div>)]);
-		}
-
-		if ( !loading && this.hasUnreadNotifications() ) {
-			Notifications.push([-2, (<ButtonLink onclick={ e => { this.clearNotifications(); } } ><em>Mark all as read</em></ButtonLink>)]);
-		}
-
-		Notifications.push([-1, (<ButtonLink onclick={ e => { this.hide(); } } href='/my/notifications'><em>Open notifications feed...</em></ButtonLink>)]);
+		Notifications.push([-1, (<ButtonLink onclick={this.hide} href="/my/notifications"><em>Open notifications feed...</em></ButtonLink>)]);
 
 		return (
-			<Dropdown class='-notifications' items={Notifications} startExpanded={true} hideSelectedField={true} />
+			<Dropdown class="-notifications" items={Notifications} expanded={true} hideSelectedField={true} onhide={this.hide} />
 		);
 	}
 }

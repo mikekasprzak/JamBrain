@@ -11,19 +11,16 @@ import Route							from 'com/router/route';
 
 import Layout							from "com/page/layout";
 
-import PageHome 						from 'com/page/home/home';
-import PagePage 						from 'com/page/page/page';
-import PagePost 						from 'com/page/post/post';
-import PageItem 						from 'com/page/item/item';
-import PageTag 							from 'com/page/tag/tag';
-import PageUser 						from 'com/page/user/user';
-import PageUsers 						from 'com/page/users/users';
-import PageEvent 						from 'com/page/event/event';
-import PageEvents 						from 'com/page/events/events';
+import PageRoot 						from 'com/page/root/root';
+import PagePage 						from 'com/page/node/page/page';
+import PagePost 						from 'com/page/node/post/post';
+import PageItem 						from 'com/page/node/item/item';
+import PageTag 							from 'com/page/node/tag/tag';
+import PageUser 						from 'com/page/node/user/user';
+import PageUsers 						from 'com/page/node/users/users';
+import PageEvent 						from 'com/page/node/event/event';
+import PageEvents 						from 'com/page/node/events/events';
 import PageError 						from 'com/page/error/error';
-import PageMySettings 					from 'com/page/my/settings';
-import PageMyNotifications 				from 'com/page/my/notifications';
-import PageDevPalette 					from 'com/page/dev/palette';
 
 import DialogUnfinished					from 'com/dialog/unfinished/unfinished';
 import DialogLogin						from 'com/dialog/login/login';
@@ -38,6 +35,8 @@ import DialogUserConfirm				from 'com/dialog/user/user-confirm';
 import DialogSubmit						from 'com/dialog/submit/submit';
 import DialogTV							from 'com/dialog/tv/tv';
 import DialogCreate						from 'com/dialog/create/create';
+import DialogErrorUpload				from 'com/dialog/errorupload/errorupload';
+import DialogErrorPublish				from 'com/dialog/errorpublish/errorpublish';
 
 //import AlertBase						from 'com/alert-base/base';
 
@@ -52,7 +51,7 @@ window.SITE_ROOT = 1;
 
 // NOTE: Deprecated
 // Add special behavior: when class attribute is an array, flatten it to a string
-options.vnode = function(vnode) {
+options.vnode = function _CustomVNode(vnode) {
 	if ( vnode && vnode.attributes && Array.isArray(vnode.attributes.class) ) {
 		if ( vnode.attributes.class.length ) {
 			vnode.attributes.class = vnode.attributes.class.join(' ');
@@ -72,7 +71,7 @@ class Main extends Component {
 		console.log("Running in DEBUG mode");
 		// @endif
 
-		var clean = this.cleanLocation(window.location);
+		let clean = this.cleanLocation(window.location);
 		if ( window.location.origin+clean.path !== window.location.href ) {
 			// @ifdef DEBUG
 			console.log("Cleaned URL: "+window.location.href+" => "+window.location.origin+clean.path);
@@ -91,6 +90,9 @@ class Main extends Component {
 			'node': {
 				'id': 0
 			},
+			'parent': null,
+			'superparent': null,
+			'author': null,
 
 			// Root Node
 			'root': null,
@@ -107,13 +109,23 @@ class Main extends Component {
 		window.addEventListener('popstate', this.onPopState.bind(this));
 
 		this.onLogin = this.onLogin.bind(this);
-
-//        this.doEverything();
 	}
 
 	componentDidMount() {
-		this.fetchData();
-		this.fetchRoot();
+		this.fetchUser();
+		this.fetchFeatured();	// Fetches root, featured, and all games associated with you
+		this.fetchNode();
+
+//		return Promise.all([
+//			this.fetchUser(),
+//			this.fetchFeatured(),
+//			this.fetchNode()
+//		]).then(r => {
+//
+//		});
+//		.catch(err => {
+//			this.setState({'error': err});
+//		});
 	}
 
 	storeHistory( input, page_title = null, page_url = null ) {
@@ -141,7 +153,7 @@ class Main extends Component {
 
 	cleanLocation( location ) {
 		// Clean the URL
-		var clean = {
+		let clean = {
 			"pathname": Sanitize.clean_Path(location.pathname),
 			"search": Sanitize.clean_Query(location.search),
 			"hash": Sanitize.clean_Hash(location.hash),
@@ -156,7 +168,7 @@ class Main extends Component {
 	}
 
 	getDialog() {
-		var props = Sanitize.parseHash(window.location.hash);
+		let props = Sanitize.parseHash(window.location.hash);
 
 		if ( window.location.hash ) {
 			if ( window.location.hash.indexOf("/") != 1 && props.path !== "--") {
@@ -176,7 +188,6 @@ class Main extends Component {
 						return <DialogReset {...props} />;
 					case 'user-password':
 						return <DialogPassword {...props} />;
-
 					case 'expired':
 						return <DialogSession {...props} />;
 					case 'savebug':
@@ -187,6 +198,10 @@ class Main extends Component {
 						return <DialogSubmit {...props} />;
 					case 'tv':
 						return <DialogTV {...props} />;
+					case 'error-upload':
+						return <DialogErrorUpload {...props} />;
+					case 'error-publish':
+						return <DialogErrorPublish {...props} />;
 					default:
 						return <DialogUnfinished {...props} />;
 				}
@@ -198,156 +213,106 @@ class Main extends Component {
 	// Called by the login dialog
 	onLogin() {
 		this.setState({'user': null});
-		this.fetchData();
+//		this.fetchUser();
+//		this.fetchFeatured();
 	}
 
 	// *** //
 
-	fetchRoot() {
-		console.log("[fetchRoot]");
+	fetchFeatured( node_id ) {
+		console.log("[fetchFeatured] +");
 
-		return $Node.Get(SITE_ROOT)
-		.then(r => {
-			if ( r.node.length ) {
-				var node = r.node[0];
+		// Used across everything below
+		let Node = null;
 
-				this.setState({
-					'root': node
-				});
+		return $Node.What(SITE_ROOT).then(r => {
+			let newState = {};
 
-				if ( node.meta['featured'] && (node.meta['featured']|0) > 0 ) {
-					return this.fetchFeatured(node.meta['featured']|0);
+			newState.root = r.root;
+			newState.featured = r.featured;
+			newState.featured.what = r.node;
+
+			//console.log("root:", r.root);
+			//console.log("featured:", r.featured);
+			//console.log("node:", r.node);
+
+			let focus = 0;
+			let focusDate = 0;
+			let lastPublished = 0;
+
+			console.log("[fetchFeatured] Hack! We don't support choosing your active game yes, so use logic to detect it");
+			for ( let key in r.node ) {
+				let newDate = new Date(r.node[key].modified).getTime();
+				if ( newDate > focusDate ) {
+					focusDate = newDate;
+					focus = key|0;
 				}
-				console.log("[fetchRoot] Done:", node.id);
+				if ( r.node[key].published ) {
+					lastPublished = key|0;
+					console.log('[fetchFeatured] '+key+' is published');
+				}
 			}
-			else {
-				throw '[fetchRoot] Failed to load root node';
+			if ( focus ) {
+				console.log('[fetchFeatured] '+focus+' was the last modified');
 			}
-		})
-		.catch(err => {
-			this.setState({'error': err});
+
+			// If the last updated is published, focus on that
+			if ( r.node[focus] && r.node[focus].published ) {
+				newState.featured.focus_id = focus;
+			}
+			// If not, make it the last known published game
+			else if ( lastPublished ) {
+				newState.featured.focus_id = lastPublished;
+			}
+			// Otherwise, just the last one we found
+			else { //if ( focus > 0 ) {
+				newState.featured.focus_id = focus;
+			}
+
+			console.log('[fetchFeatured] - '+newState.featured.focus_id+' chosen as focus_id');
+
+			this.setState(newState);
 		});
 	}
 
-	fetchFeatured( node_id ) {
-		console.log("[fetchFeatured]");
+	fetchNode( newArgs ) {
+		console.log("[fetchNode] +");
 
-		// Used across everything below
-		var Node = null;
-
-		return $Node.Get(node_id)
-			.then(r => {
-				// If
-				if ( r && Array.isArray(r.node) && r.node.length ) {
-					Node = r.node[0];
-
-					console.log("[fetchFeatured] +", Node.id);
-
-					return $Node.What(Node.id);
-				}
-
-				// No featured event
-				return null;
-			})
-			.then(r => {
-				if ( r && r.what ) {
-					Node.what = r.what;
-
-					console.log('[fetchFeatured] My Game(s):', Node.what);
-
-					if ( Node.what.length ) {
-						return $Node.GetKeyed(r.what);
-					}
-				}
-
-				return Promise.resolve({});
-			})
-			.then( r => {
-				if ( r && r.node ) {
-					Node.what_node = r.node;
-
-					var Focus = 0;
-					var FocusDate = 0;
-					var LastPublished = 0;
-
-					for ( var key in r.node ) {
-						var NewDate = new Date(r.node[key].modified).getTime();
-						if ( NewDate > FocusDate ) {
-							FocusDate = NewDate;
-							Focus = key|0;
-						}
-						if ( r.node[key].published ) {
-							LastPublished = key|0;
-							console.log('[fetchFeatured] '+key+' is published');
-						}
-					}
-					if ( Focus ) {
-						console.log('[fetchFeatured] '+Focus+' was the last modified');
-					}
-
-					// If the last updated is published, focus on that
-					if ( r.node[Focus].published ) {
-						Node.focus = Focus;
-					}
-					// If not, make it the last known published game
-					else if ( LastPublished ) {
-						Node.focus = Lastpublished;
-					}
-					// Otherwise, just the last one we found
-					else if ( Focus > 0 ) {
-						Node.focus = Focus;
-					}
-
-					if ( Node.focus || Node.focus === 0 ) {
-						console.log('[fetchFeatured] '+Node.focus+' chosen as Focus');
-					}
-				}
-
-				this.setState({
-					'featured': Node
-				});
-
-				console.log('[fetchFeatured] -', Node.id);
-
-				return r;
-			})
-			.catch(err => {
-				this.setState({'error': err});
-			});
-	}
-
-	fetchNode() {
-		//console.log("[fetchNode]");
-
-		var NewState = {};
+		let args = ['node', 'parent', 'superparent', 'author'];
+		if ( newArgs ) {
+			args = args.concat(newArgs);
+		}
 
 		// Walk to the active node
-		return $Node.Walk(SITE_ROOT, this.state.slugs)
-		.then(r => {
-			if ( r && r.node ) {
-				NewState['path'] = (r.path.length ? '/' : '') +this.state.slugs.slice(0, r.path.length).join('/');
-				NewState['extra'] = r.extra;
+		return $Node.Walk(SITE_ROOT, this.state.slugs, args).then(r => {
+			// Store the path determined by the walk
+			if ( r.node_id ) {
+				let NewState = {};
 
-				// Now, lookup the node
-				return $Node.Get(r.node);
-			}
-			else {
-				throw '[fetchNode] Unable to walk tree';
-			}
-			return null;
-		})
-		.then(r => {
-			// Process node
-			if ( r && r.node && r.node.length ) {
-				NewState['node'] = r.node[0];
+				NewState.path = (r.path.length ? '/' : '') +this.state.slugs.slice(0, r.path.length).join('/');
+				NewState.extra = r.extra;
+
+				NewState.node = r.node[r.node_id];
+				NewState.parent = NewState.node.parent ? r.node[NewState.node.parent] : null;
+				NewState.superparent = NewState.node.superparent ? r.node[NewState.node.superparent] : null;
+				NewState.author = NewState.node.author ? r.node[NewState.node.author] : null;
+//
+//				if ( r.node[SITE_ROOT] ) {
+//					NewState.root = r.node[SITE_ROOT];
+//				}
+
 				this.setState(NewState);
 
-				//console.log("[fetchNode] Done:", NewState['node'].id);
+//				// If root was returned, then trigger a featured lookup ("|0" is string-to-integer conversion)
+//				if ( r.node[SITE_ROOT] && r.node[SITE_ROOT].meta['featured'] && ((r.node[SITE_ROOT].meta['featured']|0) > 0) ) {
+//					return this.fetchFeatured(r.node[SITE_ROOT].meta['featured']|0);
+//				}
+
+				console.log("[fetchNode] - Node:", r.node_id);
+
+				return null;
 			}
-			else {
-				throw '[fetchNode] No nodes found';
-			}
-			return null;
+			throw "[fetchNode] Unable to walk tree";
 		})
 		.catch(err => {
 			this.setState({'error': err});
@@ -355,79 +320,33 @@ class Main extends Component {
 	}
 
 	fetchUser() {
-		console.log("[fetchUser]");
+		console.log("[fetchUser] +");
 
-		var Caller = 0;
-		var User = {
+		let User = {
 			'id': 0
 		};
 
-		// Fetch the Active User
-		return $User.Get().then(r => {
-			Caller = r.caller_id|0;
-			console.log("[fetchUser] caller_id:", Caller);
-
-			// Process my User
-			if ( Caller && r.node ) {
+		// Fetch Active User
+		return $Node.GetMy().then(r => {
+			if ( r.node ) {
 				User = Object.assign({}, r.node);
 				User['private'] = {};
-
-				// Pre-cache my Love (not returned)
-				$NodeLove.GetMy();
-			}
-			return null;	// Do we need this?
-		})
-		.then(r => {
-			if ( Caller && User.id ) {
-				// Load user's private data
-				return $Node.GetMy();
-			}
-			return null;	// Do we need this?
-		})
-		.then(r => {
-			// Process private User data
-			if ( r ) {
 				User['private']['meta'] = r.meta;
-//				User['private']['link'] = r.link;
 				User['private']['refs'] = r.refs;
 			}
 
 			// Finally, user is ready
-			this.setState({
-				'user': User
-			});
+			this.setState({'user': User});
 
-			console.log("[fetchUser] Done:", Caller);
+			console.log("[fetchUser] - You are", User.id, "("+User.name+")");
 
-			return null;	// Do we need this?
+			// Pre-cache my Love (nothing to do with it)
+			return $NodeLove.GetMy();
 		})
 		.catch(err => {
-			this.setState({
-				'error': err
-			});
+			// An error here isn't actually an error. It just means we have no user
+			this.setState({'user': User});
 		});
-	}
-
-
-	fetchData() {
-		console.log("[fetchData]");
-
-		// If no user
-		if ( !this.state.user ) {
-			// First, fetch the user
-			return this.fetchUser().then(() => {
-				// Next, fetch the node (if not loaded)
-				if ( this.state.node && !this.state.node.id ) {
-					return this.fetchNode();
-				}
-				return null;
-			});
-		}
-		// Fetch the node (if not loaded)
-		else if ( this.state.node && !this.state.node.id ) {
-			return this.fetchNode();
-		}
-		return null;
 	}
 
 	// *** //
@@ -435,7 +354,7 @@ class Main extends Component {
 	// Hash Changes are automatically differences
 	onHashChange( e ) {
 		console.log("hashchange: ", e.newURL);
-		var slugs = this.cleanLocation(window.location).slugs;
+		let slugs = this.cleanLocation(window.location).slugs;
 
 		if ( slugs.join() === this.state.slugs.join() ) {
 			this.setState({});
@@ -449,16 +368,16 @@ class Main extends Component {
 		this.handleAnchors();
 	}
 
-	handleAnchors() {
-		if ( window.location.hash ) {
-			var hash = Sanitize.parseHash(window.location.hash);
+	handleAnchors(evtHash) {
+		if ( window.location.hash || evtHash ) {
+			let hash = Sanitize.parseHash(evtHash || window.location.hash);
 
 			if ( hash.path === "" && hash.extra.length > 0 ) {
-				var heading = document.getElementById(hash.extra[0]);
+				let heading = document.getElementById(hash.extra[0]);
 				if ( heading ) {
 					heading.scrollIntoView();
 
-					var viewBar = document.getElementsByClassName("view-bar")[0];
+					let viewBar = document.getElementsByClassName("view-bar")[0];
 					if ( viewBar ) {
 						window.scrollBy(0, -viewBar.clientHeight);
 					}
@@ -472,7 +391,7 @@ class Main extends Component {
 		console.log('navchange:', e.detail.old.href, '=>', e.detail.location.href);
 
 		if ( e.detail.location.href !== e.detail.old.href ) {
-			var slugs = this.cleanLocation(e.detail.location).slugs;
+			let slugs = this.cleanLocation(e.detail.location).slugs;
 
 			if ( slugs.join() !== this.state.slugs.join() ) {
 				history.pushState(null, null, e.detail.location.pathname + e.detail.location.search);
@@ -490,7 +409,7 @@ class Main extends Component {
 		// Scroll to top
 		window.scrollTo(0, 0);
 
-		this.handleAnchors();
+		this.handleAnchors(e.detail.location.hash);
 	}
 	// When we navigate using back/forward buttons
 	onPopState( e ) {
@@ -505,42 +424,37 @@ class Main extends Component {
 
 	getTitle( node ) {
 		let Title = "";
+		let TitleSuffix = window.location.host;
+		if (window.location.host == "ldjam.com") {
+			TitleSuffix += " | Ludum Dare game jam";
+		}
 
 		if ( node.name ) {
 			Title = titleParser.parse(node.name, true);		// What is titleParser?
 			if ( Title === "" ) {
-				Title = window.location.host;
+				Title = TitleSuffix;
 			}
 			else {
-				Title += " | " + window.location.host;
+				Title += " | " + TitleSuffix;
 			}
 		}
 		else {
-			Title = window.location.host;
+			Title = TitleSuffix;
 		}
 		return Title;
 	}
 
-	render( {}, {node, user, featured, path, extra, error} ) {
-		var ShowContent = null;
-		let props = {node, user, featured, path, extra, error};
+	render( {}, state ) {
+		let {node, parent, superparent, author, user, featured, path, extra} = state;
+		let NewProps = {node, parent, superparent, author, user, featured, path, extra};
 
-		if ( node ) {
+		if ( node )
 			document.title = this.getTitle(node);
-		}
 
 		return (
-			<Layout {...this.state}>
-				<Router node={node} props={props} path={extra}>
-					<Route type="root" component={PageHome}>
-						<Route static path="/my">
-							<Route static path="/settings" component={PageMySettings} />
-							<Route static path="/notifications" component={PageMyNotifications} />
-						</Route>
-						<Route static path="/dev">
-							<Route static path="/palette" component={PageDevPalette} />
-						</Route>
-					</Route>
+			<Layout {...state}>
+				<Router node={node} props={NewProps} path={extra}>
+					<Route type="root" component={PageRoot} />
 
 					<Route type="page" component={PagePage} />
 					<Route type="post" component={PagePost} />

@@ -8,8 +8,11 @@ import NavLink 							from 'com/nav-link/link';
 
 import NavSpinner						from 'com/nav-spinner/spinner';
 
+import UIButton							from 'com/ui/button/button';
+
 //import DropdownUser 					from 'com/dropdown-user/user';
-import DropdownNotification				from 'com/view/bar/bar-notifications';
+import BarNotification					from 'bar-notifications';
+import BarUser							from 'bar-user';
 
 //import $Node							from 'shrub/js/node/node';
 import $Notification					from 'shrub/js/notification/notification';
@@ -26,13 +29,35 @@ export default class ViewBar extends Component {
 		this.StartedNotificationLoop = false;
 
 		this.state - {
-			notifications: 0,
-			notificationCountAdjustment: 0,
+			'notifications': 0,
+			'notificationsHidden': 0,
+			'notificationsFeed': null,
+			//'notificationsMore': false,
 		};
+
+		this.handleNotificationsClear = this.handleNotificationsClear.bind(this);
+		this.handleNotificationsHide = this.handleNotificationsHide.bind(this);
+	}
+
+	handleNotificationsClear() {
+		this.setState({
+			'notifications': 0,
+			'notificationsHidden': 0,
+			//'notificationsFeed': null,
+			//'notificationsMore': false,
+		});
+	}
+
+	handleNotificationsHide() {
+		this.setState({'showNotifications': false});
 	}
 
 	checkNotificationCount() {
-		const loggedIn = this.props.user && this.props.user.id > -1;
+		//return; // HACK! Comment me to restore notifications
+
+		const {user} = this.props;
+		const loggedIn = user && (user.id > 0);
+		const fetchCount = 40;
 
 		if (loggedIn) {
 			let firstCall = !this.StartedNotificationLoop;
@@ -44,20 +69,48 @@ export default class ViewBar extends Component {
 				setTimeout(() => this.checkNotificationCount(), 20000);
 			}
 			else {
+				const {notifications, notificationsFeed} = this.state;
 				$Notification.GetCountUnread()
-				.then((r) => {
-					if (this.state.notifications != r.count) {
-						this.setState({notifications: r.count, notificationCountAdjustment: 0});
+				.then(r => {
+					if (r.status !== 200) {
+						location.href = '# expired';
+						setTimeout(() => this.checkNotificationCount(), 5 * 60000);
+						return Promise.reject();
 					}
-					setTimeout(() => this.checkNotificationCount(), 60000);
+					const newUnfilteredCount = r.count;
+					// Only get unread if there's a possibility that there are new notifications
+					// Only get the feed in general if it hasn't been requested before.
+					const request = newUnfilteredCount > (notifications || 0) ?
+						$Notification.GetFeedUnreadFiltered :
+             !notificationsFeed && $Notification.GetFeedAllFiltered;
+					request && request(0, fetchCount)
+					.then(r => {
+						if (this.state.notifications != r.count) {
+							this.setState({
+								'notifications': newUnfilteredCount > 0 ? r.count : 0,
+								'notificationsHidden': r.countFiltered,
+								//'notificationsMore': r.countFiltered + r.count == fetchCount,
+								'notificationsFeed': r,
+								'notificationsError': null,
+							});
+						}
+						setTimeout(() => this.checkNotificationCount(), 60000);
+					})
+					.catch((e) => {
+						this.setState({'notificationsError': 'Could not retrieve notifications feed.'});
+						setTimeout(() => this.checkNotificationCount(), 5 * 60000);
+						console.log('[Notificaton error]', e);
+					});
 				})
 				.catch((e) => {
+					this.setState({'notificationsError': 'Could not retrieve notifications count.'});
 					setTimeout(() => this.checkNotificationCount(), 5 * 60000);
-					console.log('[Notificaton error]', e);
+					console.log('[Notificaton count error]', e);
 				});
 			}
 		}
 		else {
+			this.handleNotificationsClear();
 			this.StartedNotificationLoop = false;
 		}
 	}
@@ -65,7 +118,9 @@ export default class ViewBar extends Component {
 	componentDidMount() {
 		document.body.classList.add('_use-view-bar');
 
-		this.checkNotificationCount();
+		if ( !this.StartedNotificationLoop ) {
+			this.checkNotificationCount();
+		}
 	}
 
 	componentWillUnmount() {
@@ -98,113 +153,173 @@ export default class ViewBar extends Component {
 	renderRight( user, featured ) {
 		var Search = null;
 //		var Search = (
-//			<ButtonBase class="-icon" onclick={e => { console.log('search'); window.location.hash = "#search"; }}>
+//			<ButtonBase class="-bar-icon" onclick={e => { console.log('search'); window.location.hash = "#search"; }}>
 //				<SVGIcon baseline>search</SVGIcon>
 //			</ButtonBase>
 //		);
 
 		var ShowCalendar = (
-			<ButtonBase class="-button if-no-sidebar-block" onclick={e => { console.log('calendar'); window.location.hash = "#cal"; }}>
+			<UIButton
+				class="-bar-button if-no-sidebar-block"
+				onclick={e => {
+						console.log('calendar');
+						window.location.hash = "#cal";
+				}}
+			>
 				<SVGIcon baseline>calendar</SVGIcon>
 				<div class="if-sidebar-block">Schedule</div>
-			</ButtonBase>
+			</UIButton>
 		);
 
-		var ShowJoin = null;
-		var ShowMyGame = null;
-		var NewPost = null;
+		let ShowJoin = null;
+		let ShowMyGame = null;
+		let NewPost = null;
 		let Notification = null;
-		var ShowUser = null;
-		var Register = null;
-		var Login = null;
-		var GoSecure = null;
-		var ShowSpinner = null;
+		let ShowUser = null;
+		let Register = null;
+		let Login = null;
+		let GoSecure = null;
+		let ShowSpinner = null;
 		let ShowNotifications = null;
 
 		// Disallow insecure login
 		if ( SECURE_LOGIN_ONLY && (location.protocol !== 'https:') ) {
 			let SecureURL = 'https://'+location.hostname+location.pathname+location.search+location.hash;
 			GoSecure = (
-				<ButtonBase class="-button" href={SecureURL} onclick={e => {console.log('secure'); location.href = SecureURL;}}>
+				<UIButton
+					class="-bar-button"
+					noblank
+					href={SecureURL}
+				>
 					<SVGIcon>unlocked</SVGIcon>
 					<div class="if-sidebar-block">Go to Secure Site</div>
-				</ButtonBase>
+				</UIButton>
 			);
 		}
 		// Both user and user.id means logged in
 		else if ( user && user.id ) {
 			if ( featured && featured.id ) {
-				if ( featured.focus ) {
+				// Has a game
+				if ( featured.focus_id && featured.what ) {
 					ShowMyGame = (
-						<ButtonLink href={featured.what_node[featured.focus].path} class="-button">
+						<UIButton href={featured.what[featured.focus_id].path} class="-bar-button">
 							<SVGIcon>gamepad</SVGIcon>
 							<div class="if-sidebar-block">My Game</div>
-						</ButtonLink>
+						</UIButton>
 					);
 
 					NewPost = (
-						<ButtonBase class="-button" onclick={e => { window.location.hash = "#create/"+featured.focus+"/post"; }}>
+						<UIButton
+							class="-bar-button"
+							onclick={e => {
+								window.location.hash = "#create/"+featured.focus_id+"/post";
+							}}
+						>
 							<SVGIcon>edit</SVGIcon>
 							<div class="if-sidebar-block">New</div>
-						</ButtonBase>
+						</UIButton>
 					);
 				}
+				// Let them create a game
 				else if ( node_CanCreate(featured) ) {
 					ShowJoin = (
-						<ButtonBase class="-button" onclick={e => { window.location.hash = "#create/"+featured.id+"/item/game"; }}>
+						<UIButton
+							class="-bar-button"
+							onclick={e => {
+								window.location.hash = "#create/"+featured.id+"/item/game";
+							}}
+						>
 							<SVGIcon>publish</SVGIcon>
 							<div class="if-sidebar-block">Join Event</div>
-						</ButtonBase>
+						</UIButton>
 					);
 				}
 			}
 
 			// Notifications
 			let NotificationCount = null;
-			const notificationCount = Math.max(0, this.state.notifications - this.state.notificationCountAdjustment);
+			const notificationCount = this.state.notifications;
 			if (notificationCount > 0) {
+				/*
+				if (this.state.notificationsMore) {
+					NotificationCount = (<div class="-count">{notificationCount}<sup>+</sup></div>);
+
+				}
+				else { */
 				NotificationCount = (<div class="-count">{notificationCount}</div>);
 			}
+			/* else if (this.state.notificationsMore) {
+				if (NotificationCount === null) {
+					NotificationCount = (<div class="-count">+</div>);
+				}
+			}
+			else if (this.state.notificationsHidden) {
+				NotificationCount = (<div class="-count">({this.state.notificationsHidden})</div>);
+			} */
 
 			if (this.state.showNotifications) {
-				ShowNotifications = (<DropdownNotification clearCallback={ () => this.setState({notifications: 0}) } hideCallback={ () => this.setState({showNotifications: false}) } />);
+				ShowNotifications = (
+					<BarNotification
+						feed={this.state.notificationsFeed}
+						anythingToMark={this.state.notifications > 0 || this.state.notificationsHidden > 0}
+						clearCallback={this.handleNotificationsClear}
+						hideCallback={this.handleNotificationsHide}
+						error={this.state.notificationsError}
+					/>
+				);
 			}
 
 			Notification = (
-				<ButtonBase class="-icon" onclick={(e) => {
+				<UIButton class="-bar-icon" onclick={(e) => {
 					// TODO: if the main content is the notifications feed, clicking the button should
 					// probably not show the dropdown, but load new comments into the feed.
-					this.setState({showNotifications: !this.state.showNotifications});
+					this.setState({'showNotifications': !this.state.showNotifications});
 				}}>
 					<SVGIcon baseline>bubble</SVGIcon>
 					{NotificationCount}
-				</ButtonBase>
+				</UIButton>
 			);
 
+/*
 			// TODO: Pull this out of the user meta, else use a dummy
 			let Avatar = (user.meta && user.meta.avatar) ? <img src={"//"+STATIC_DOMAIN+user.meta.avatar} /> : <img src={'//'+STATIC_DOMAIN+'/other/dummy/user64.png'} />;
 			//'/other/logo/mike/Chicken64.png';
 			let MyURL = '/users/'+user.slug+'/';
 			ShowUser = [
-				<ButtonBase class="-user">
+				<UIButton class="-user">
 					<NavLink href={MyURL}>{Avatar}</NavLink>
-				</ButtonBase>,
+				</UIButton>,
 //				<DropdownUser />
 			];
+*/
+
+			ShowUser = <BarUser user={user} />;
 		}
 		// If user has finished loading (and is not logged in)
 		else if ( user ) {
 			Register = (
-				<ButtonBase class="-button" onclick={e => { console.log('register'); window.location.hash = "#user-register"; }}>
+				<UIButton
+					class="-bar-button"
+					onclick={e => {
+						console.log('register');
+						window.location.hash = "#user-register";
+					}}
+				>
 					<SVGIcon>user-plus</SVGIcon>
 					<div class="if-sidebar-block">Create Account</div>
-				</ButtonBase>
+				</UIButton>
 			);
 			Login = (
-				<ButtonBase class="-button" onclick={e => { console.log('login'); window.location.hash = "#user-login"; }}>
+				<UIButton
+					class="-bar-button"
+					onclick={e => {
+						console.log('login');
+						window.location.hash = "#user-login";
+					}}
+				>
 					<SVGIcon>key</SVGIcon>
 					<div class="if-sidebar-block">Login</div>
-				</ButtonBase>
+				</UIButton>
 			);
 		}
 		// Still waiting
@@ -250,10 +365,10 @@ export default class ViewBar extends Component {
 			<div class="view-bar">
 				<div class="-content">
 					<div class="-left">
-						<ButtonLink href="/" class="-logo">
+						<UIButton title="Ludum Dare" href="/" class="-logo">
 							<SVGIcon class="if-sidebar-block" baseline>ludum</SVGIcon><SVGIcon class="if-sidebar-block" baseline>dare</SVGIcon>
 							<SVGIcon class="if-no-sidebar-block" baseline>l-udum</SVGIcon><SVGIcon class="if-no-sidebar-block" baseline>d-are</SVGIcon>
-						</ButtonLink>
+						</UIButton>
 					</div>
 					{ShowLoading}
 					{this.renderRight(user, featured)}
