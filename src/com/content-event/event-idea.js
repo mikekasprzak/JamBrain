@@ -4,8 +4,6 @@ import SVGIcon 							from 'com/svg-icon/icon';
 import UIButton							from 'com/ui/button/button';
 import $Node							from 'shrub/js/node/node';
 import $ThemeIdea						from 'shrub/js/theme/theme_idea';
-import $ThemeIdeaVote from 'shrub/js/theme/theme_idea_vote';
-import $ThemeHistory from 'shrub/js/theme/theme_history';
 import Sanitize							from 'internal/sanitize/sanitize';
 
 const SHOW_PREVIOUS = 6;
@@ -34,7 +32,6 @@ export default class ContentEventIdea extends Component {
 
 	componentDidMount() {
 		this.getPreviousEventThemes();
-		this.getEveryonesIdeas();
 
 		$ThemeIdea.GetMy([this.props.node.id])
 		.then(r => {
@@ -51,15 +48,6 @@ export default class ContentEventIdea extends Component {
 		});
 	}
 
-	getEveryonesIdeas() {
-		$ThemeIdeaVote.Get(this.props.node.id)
-			.then((r) => {
-				if (r.status === 200 && r.ideas) {
-					this.setState({'everyonesIdeas': Object.values(r.ideas).map(idea => ({'theme': idea, 'type': 'suggestion'}))});
-				}
-		});
-	}
-
 	getPreviousEventThemes() {
 		//TODO: Handle more than 50 events with offsets
 		$Node.GetFeed(this.props.node.parent, 'parent', 'event', null, null, null, null, 50)
@@ -71,30 +59,19 @@ export default class ContentEventIdea extends Component {
 						.filter((n) => n.id !== this.props.node.id)
 						.reverse()
 						.map((n) => {
-							return {'id': n.id, 'start': n.meta['event-start'], 'theme': n.meta['event-theme'], 'name': n.name, 'type': 'theme', 'number': n.name.match(/\d+/)[0]};
+							return {'id': n.id, 'start': n.meta['event-start'], 'theme': n.meta['event-theme'], 'name': n.name};
 						});
 					this.setState({'previousThemes': eventThemes});
 				})
 				.catch((err) => (this.setState({'error': "Could not retrieve previous events."})));
 			})
 			.catch((err) => (this.setState({'error': "Could not find list of previous events."})));
-		$ThemeHistory.Get()
-			.then(r => {
-				if (r.status === 200) {
-					const history = r.history.filter(evt => evt.name.indexOf('Ludum Dare') === 0).map(evt => ({'type': 'theme', ...evt, 'number': evt.name.match(/\d+/)[0]}));
-					this.setState({'history': history});
-				}
-			});
 	}
 
 	textChange( e, isSubmit ) {
 		let idea = e.target.value;
 		if ( isSubmit ) {
 			idea = idea.trim();
-			this.setState({'similarThemes': []});
-		}
-		else {
-			this.findSimilar(idea.trim());
 		}
 		this.setState({'idea': idea, 'error': ((idea.length > 64) ? "Suggestion is too long." : null)});
 	}
@@ -251,7 +228,7 @@ export default class ContentEventIdea extends Component {
 					'idea': (r.status === 201) ? '' : idea,
 					'enableSubmit': canHaveMoreIdeas(r.ideas, false, this.state.maxIdeas),
 					'processingIdea': null,
-					'everyonesIdeas': this.state.everyonesIdeas ? this.state.everyonesIdeas.concat([idea]) : [idea]
+					'everyonesIdeas': this.state.everyonesIdeas ? this.state.everyonesIdeas.concat([idea]) : [idea],
 				});
 
 				return r;
@@ -286,7 +263,7 @@ export default class ContentEventIdea extends Component {
 
 	render( props, state ) {
 		const {node, user} = props;
-		const {idea, ideas, error, enableSubmit, maxIdeas, previousThemes, similarThemes} = state;
+		const {idea, ideas, error, enableSubmit, maxIdeas, previousThemes} = state;
 		if ( node.slug && ideas ) {
 			if ( user && user['id'] ) {
 				if (maxIdeas == 0) {
@@ -323,7 +300,6 @@ export default class ContentEventIdea extends Component {
 				}
 				const ShowError = error ? <div class="content-base content-post idea-error">{error}</div> : null;
 				let ShowSubmit = null;
-				let ShowSimilar = null;
 				if ( enableSubmit ) {
 					ShowSubmit = (
 						<div class="idea-form">
@@ -334,26 +310,6 @@ export default class ContentEventIdea extends Component {
 								<UIButton onclick={this.submitIdeaForm}>
 								<SVGIcon>suggestion</SVGIcon> Submit
 							</UIButton>
-						</div>
-					);
-					let SimilarThemes;
-					if (similarThemes && similarThemes.length > 0) {
-						SimilarThemes = similarThemes
-								.map(t => (
-									<span class={cN("idea-similar",(t.score < 2) && "-urgent")}>
-											{t.type === 'theme' && <span class="event-theme"><SVGIcon>l-udum</SVGIcon><SVGIcon>d-are</SVGIcon> {t.number}</span>}
-										{t.theme}
-									</span>
-								));
-					}
-					else {
-						SimilarThemes = "No other theme is similar to yours!";
-					}
-					ShowSimilar = (
-						<div class="idea-similar-box">
-							<h5>Similar Themes</h5>
-							{SimilarThemes}
-							<div class="-info">Themes with an "LD" are the winning themes from a prior event.</div>
 						</div>
 					);
 				}
@@ -383,7 +339,6 @@ export default class ContentEventIdea extends Component {
 						<h4>Your Suggestions</h4>
 						{ShowMySuggestions}
 						{ShowSubmit}
-						{ShowSimilar}
 						{ShowError}
 						{ShowRemaining}
 					</div>
