@@ -18,6 +18,55 @@ function commentLove_CountByNode( $node ) {
 	return $ret;
 }
 
+
+// For us: event_id, our game_id, our team's author ids
+// Not our node (i.e. other games), comments (comments) authored by us, ignoring love from us and our team
+function commentLove_CountBySuperNotNodeAuthorKnownNotAuthorThreshold( $supernode_id, $node_id, $author_ids, $min_love = 0 ) {
+	if ( !is_array($author_ids) )
+		$author_ids = [$author_ids];
+
+	return db_QueryFetchValue(
+		"SELECT
+			id,
+			COUNT(id) AS count
+		FROM
+			".SH_TABLE_PREFIX.SH_TABLE_NOTE_LOVE."
+		WHERE
+			supernode=?
+			AND node!=?
+			AND authornode IN (".implode(',', $author_ids).")
+			AND author > 0
+			AND author NOT IN (".implode(',', $author_ids).")
+		GROUP BY id
+		;",
+		$supernode_id,
+		$node_id
+	);
+}
+
+// Against us: event_id, our game_id, our team's author ids
+// All comments (comments) on our game not by us, and ignoring any love by us and our team
+function commentLove_CountBySuperNodeNotAuthorKnownNotAuthorThreshold( $supernode_id, $node_id, $author_ids, $min_love = 0 ) {
+	if ( !is_array($author_ids) )
+		$author_ids = [$author_ids];
+
+	return db_QueryFetchValue(
+		"SELECT
+			COUNT(id) AS count
+		FROM
+			".SH_TABLE_PREFIX.SH_TABLE_NOTE_LOVE."
+		WHERE
+			supernode=?
+			AND node=?
+			AND authornode NOT IN (".implode(',', $author_ids).")
+			AND author > 0
+			AND author NOT IN (".implode(',', $author_ids).")
+		;",
+		$supernode_id,
+		$node_id
+	);
+}
+
 // For us: event_id, our game_id, our team's author ids
 // Not our node (i.e. other games), comments (comments) authored by us, ignoring love from us and our team
 function commentLove_CountBySuperNotNodeAuthorKnownNotAuthor( $supernode_id, $node_id, $author_ids ) {

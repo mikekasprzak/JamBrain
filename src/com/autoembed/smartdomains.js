@@ -12,6 +12,12 @@ export default SmartDomains = [
         "embed_test": "(?:youtu\\.be\\/)(.*)(?:)",
     },
     {
+        "domain": "youtube.com",
+        "icon_name": "youtube",
+        "embed_test": "(?:youtube\\.com\\/playlist\\?list=)(.*)(?:)",
+
+	},
+    {
         "domain": "github.com",
         "icon_name": "github"
     },
