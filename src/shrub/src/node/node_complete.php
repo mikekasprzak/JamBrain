@@ -1,13 +1,14 @@
 <?php
 require_once __DIR__."/../comment/comment_core.php";
 require_once __DIR__."/../grade/grade_core.php";
+require_once __DIR__."/../file/file_core.php";
 
 const F_NODE_ALL = 0xFFFFFF;			// NOTE: 24bit. Bits above 24bit must be explicitly included
 
 const F_NODE_META = 0x1;
 const F_NODE_LINK = 0x2;
 const F_NODE_PATH = 0x4;
-//const F_NODE_ = 0x8;
+const F_NODE_FILES = 0x8;
 const F_NODE_LOVE = 0x10;
 const F_NODE_COMMENT = 0x20;
 const F_NODE_COUNT = 0x40;
@@ -34,14 +35,31 @@ function nodeComplete_GetById( $ids, $flags = F_NODE_ALL ) {
 	if ( !$nodes )
 		return null;
 
+	// Populate some additional fields
+	foreach ( $nodes as &$node ) {
+		$node['scope'] = 'public';
+		$node['node-timestamp'] = $node['modified'];
+	}
+
 	// Populate Metadata
 	if ( $flags & F_NODE_META ) {
-		$metas = nodeMeta_ParseByNode($ids);//, !($flags & F_NODE_NO_LINKVALUE));
+		$data = nodeMeta_ParseByNode($ids, true, true);//, !($flags & F_NODE_NO_LINKVALUE));
+		$metas = $data[0];
+		$modified = $data[1];
 		foreach ( $nodes as &$node ) {
 			// Store Public Metadata
 			if ( isset($metas[$node['id']][0][SH_SCOPE_PUBLIC]) ) {
 				$node['meta'] = $metas[$node['id']][0][SH_SCOPE_PUBLIC];
 //				$node['refs'] = $metas[$node['id']][0][SH_SCOPE_PUBLIC];
+
+				$index = strval($node['id']);
+
+				$node['meta-timestamp'] = $modified[$index];
+
+				// If the modified date of the metadata is newer, change the modified date
+				if ( isset($modified[$index]) && (strtotime($modified[$index]) > strtotime($node['modified'])) ) {
+					$node['modified'] = $modified[$index];
+				}
 			}
 			else {
 				$node['meta'] = [];
@@ -77,6 +95,25 @@ function nodeComplete_GetById( $ids, $flags = F_NODE_ALL ) {
 
 	// **** //
 
+	// Populate Files
+	if ( $flags & F_NODE_FILES ) {
+		foreach ( $nodes as &$node ) {
+			$node['files'] = file_GetByNode($node['id']);//, "name='\$\$embed.zip'");//"`status`=9");
+			$node['files-timestamp'] = 0;
+			foreach ( $node['files'] as $file ) {
+				if ( strtotime($file['timestamp']) > strtotime($node['files-timestamp']) ) {
+					$node['files-timestamp'] = $file['timestamp'];
+				}
+
+				if ( strtotime($file['timestamp']) > strtotime($node['modified']) ) {
+					$node['modified'] = $file['timestamp'];
+				}
+			}
+		}
+	}
+
+	// **** //
+
 	// Populate Love
 	if ( $flags & F_NODE_LOVE ) {
 		$loves = nodeLove_GetByNode($ids);
@@ -87,6 +124,11 @@ function nodeComplete_GetById( $ids, $flags = F_NODE_ALL ) {
 				if ( $node['id'] === $love['node'] ) {
 					$node['love'] = $love['count'];
 					$node['love-timestamp'] = $love['timestamp'];
+
+					// If the timestamp is newer, change the modified date
+					if ( isset($love['timestamp']) && (strtotime($love['timestamp']) > strtotime($node['modified'])) ) {
+						$node['modified'] = $love['timestamp'];
+					}
 				}
 			}
 		}
@@ -104,6 +146,11 @@ function nodeComplete_GetById( $ids, $flags = F_NODE_ALL ) {
 					if ( $node['id'] === $comment['node'] ) {
 						$node['comments'] = $comment['count'];
 						$node['comments-timestamp'] = $comment['timestamp'];
+
+						// If the timestamp is newer, change the modified date
+						if ( isset($comment['timestamp']) && (strtotime($comment['timestamp']) > strtotime($node['modified'])) ) {
+							$node['modified'] = $comment['timestamp'];
+						}
 					}
 				}
 			}

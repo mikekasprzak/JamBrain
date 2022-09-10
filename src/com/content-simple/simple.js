@@ -527,10 +527,16 @@ export default class ContentSimple extends Component {
 				props.minimized = null;
 			}
 
+			let ShowPrefix = null;
+			if ( props.prefix ) {
+				ShowPrefix = props.prefix;
+			}
+
 			return (
 				<ContentCommon {...props}>
 					{Body}
 					{ShowDraft}
+					{ShowPrefix}
 					{ShowAvatar}
 					{ShowFlag}
 					{ShowTitle}
