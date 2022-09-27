@@ -286,10 +286,32 @@ api_Exec([
 		);
 	}
 }],
+["node2/count/add", API_POST, function(&$RESPONSE) {
+	$node_id = intval(json_ArgGet(0));
+
+	if ( !$node_id ) {
+		json_EmitFatalError_BadRequest(null, $RESPONSE);
+	}
+
+	// do increment
+
+	$RESPONSE['count'] = 0;
+}],
+["node2/count/get", API_GET, function(&$RESPONSE) {
+	$node_id = intval(json_ArgGet(0));
+
+	if ( !$node_id ) {
+		json_EmitFatalError_BadRequest(null, $RESPONSE);
+	}
+
+	// read value
+
+	$RESPONSE['count'] = 0;
+}],
 /// IMPORTANT: Yes, this does not require auth. When auth is unavailable, the love belongs to the IP address.
 ///    This does make it possible for every user to give 2 loves to a thing, but overall it's way better
 ///    that a thing can be loved without a login than it is to force a user to create an account to love.
-["node2/love/add", API_POST | API_CHARGE, function(&$RESPONSE) {
-	$RESPONSE['got'] = true;
-}],
+//["node2/love/add", API_POST | API_CHARGE, function(&$RESPONSE) {
+//	$RESPONSE['got'] = true;
+//}],
 ]);

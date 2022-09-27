@@ -55,6 +55,7 @@ const SH_TABLE_NODE_META_VERSION =		"node_meta_version";
 const SH_TABLE_NODE_LOVE =				"node_love";
 const SH_TABLE_NODE_SEARCH =			"node_search";	// TODO: MK Should this be removed? Put blob in NODE?
 const SH_TABLE_NODE_MAGIC =				"node_magic";
+const SH_TABLE_NODE_COUNT =				"node_count";
 /// @}
 
 global_AddTableConstant(
@@ -65,7 +66,8 @@ global_AddTableConstant(
 	'SH_TABLE_NODE_META_VERSION',
 	'SH_TABLE_NODE_LOVE',
 	'SH_TABLE_NODE_SEARCH',		// TODO: MK Should this be removed? Put blob in NODE?
-	'SH_TABLE_NODE_MAGIC'
+	'SH_TABLE_NODE_MAGIC',
+	'SH_TABLE_NODE_COUNT'
 );
 
 global_AddReservedName(

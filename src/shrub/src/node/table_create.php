@@ -395,3 +395,25 @@ if ( in_array($table, $TABLE_LIST) ) {
 	};
 	table_Exit($table);
 }
+
+
+
+$table = 'SH_TABLE_NODE_COUNT';
+if ( in_array($table, $TABLE_LIST) ) {
+	$ok = null;
+
+	table_Init($table);
+	switch ( $TABLE_VERSION ) {
+	case 0:
+		$ok = table_Create( $table,
+			"CREATE TABLE ".SH_TABLE_PREFIX.constant($table)." (
+				id ".DB_TYPE_UID.",
+				node ".DB_TYPE_ID.",
+					INDEX(node),
+				count ".DB_TYPE_COUNT."
+
+			)".DB_CREATE_SUFFIX);
+		if (!$ok) break; $TABLE_VERSION++;
+	};
+	table_Exit($table);
+}
