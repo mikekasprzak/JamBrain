@@ -30,7 +30,7 @@ const SH_SEARCHDB_PORT = 9306;
 // Legacy Database Config //
 const WP_DB_HOST = 'localhost';
 const WP_DB_NAME = 'legacy';
-const WP_DB_login = 'root';
+const WP_DB_LOGIN = 'root';
 const WP_DB_PASSWORD = 'root';
 
 // Memcached Config //

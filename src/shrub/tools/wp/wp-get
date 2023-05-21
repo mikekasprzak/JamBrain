@@ -1,0 +1,240 @@
+#!/usr/bin/env php
+<?php
+const CONFIG_PATH = "../../";
+const SHRUB_PATH = "../../src/";
+
+include_once __DIR__."/".CONFIG_PATH."config.php";
+require_once __DIR__."/".SHRUB_PATH."core/cli_root.php";	// Confirm CLI, Require ROOT
+require_once __DIR__."/".SHRUB_PATH."wp/wp.php";
+#require_once __DIR__."/".SHRUB_PATH."core/core.php";
+#require_once __DIR__."/".SHRUB_PATH."constants.php";		// For the SH_TABLE constants. run gen.sh if not up-to-date.
+#require_once __DIR__."/".SHRUB_PATH."global/global.php";
+#require_once __DIR__."/".SHRUB_PATH."node/node.php";
+#require_once __DIR__."/".SHRUB_PATH."comment/comment.php";
+#require_once __DIR__."/".SHRUB_PATH."user/user.php";
+
+$options = wp_QueryFetchPair("SELECT option_name, option_value FROM wp_options WHERE option_name NOT LIKE '%_transient%' AND autoload='yes';");
+foreach ($options as &$option) {
+    $out = @unserialize($option, ['allowed_classes' => false]);
+    if ($out !== false) {
+        $option = $out;
+    }
+}
+
+$expenses = wp_QueryFetch("SELECT * FROM wp_expenses;");
+$donations = wp_QueryFetch("SELECT * FROM wp_donations;");
+
+$terms = wp_QueryFetch("SELECT * FROM wp_terms;");
+$term_types = [];
+$term_type_taxonomies = [];
+$final = null;
+foreach ($terms as &$term) {
+    $term['taxonomy'] = wp_QueryFetch("SELECT * FROM wp_term_taxonomy WHERE term_id=".$term['term_id'].";")[0];
+    //foreach ($term['taxonomy'] as &$tax) {
+    $tax = &$term['taxonomy'];
+    {
+        $tax['objects'] = wp_QueryFetchSingle("SELECT object_id FROM wp_term_relationships WHERE term_taxonomy_id=".$tax['term_taxonomy_id'].";");
+        $term_types[$tax['taxonomy']][$term['term_id']] = $term;
+        $term_type_taxonomies[$tax['taxonomy']][$tax['term_taxonomy_id']] = $term;
+    }
+
+    if ($term['slug'] == 'final') {
+        $final = $term;
+    }
+}
+
+
+// wp_terms['term_id'] included events
+// wp_compo_rate['cid'] are term_id's categorized as events
+// wp_compo_trophy were general trophies that users gave to each other
+// wp_compo_vote is THEME SELECTION
+
+// term 311 "final" is a post_tag that identifies games
+
+// item 966 is a game
+// LD12 is 797. Theme: The Tower
+// 3359 is Towlr
+// Mike is 19
+// wp_compo_rate you search by "compo id" (term) and user_id
+
+
+$id = 19;
+
+$users = wp_QueryFetch("SELECT * FROM wp_users WHERE id=$id;");
+$user = $users[0];
+
+// attachment
+// page
+// post
+// revision
+$user['metas'] = wp_QueryFetchPair("SELECT meta_key, meta_value FROM wp_usermeta WHERE user_id=$id;");
+foreach ($user['metas'] as &$meta) {
+    $out = @unserialize($meta, ['allowed_classes' => false]);
+    if ($out !== false) {
+        $meta = $out;
+    }
+}
+$user['posts'] = wp_QueryFetch("SELECT * FROM wp_posts WHERE post_type='post' AND post_author=$id;");
+foreach ($user['posts'] as &$post) {
+    $post['metas'] = wp_QueryFetchPair("SELECT meta_key, meta_value FROM wp_postmeta WHERE post_id=".$post['ID'].";");
+    foreach ($post['metas'] as &$meta) {
+        $out = @unserialize($meta, ['allowed_classes' => false]);
+        if ($out !== false) {
+            $meta = $out;
+        }
+    }
+
+    $post['comments'] = wp_QueryFetch("SELECT * FROM wp_comments WHERE comment_post_ID=".$post['ID'].";");
+    foreach ($post['comments'] as &$comment) {
+        $comment['metas'] = wp_QueryFetchPair("SELECT meta_key, meta_value FROM wp_commentmeta WHERE comment_id=".$comment['comment_ID'].";");
+        foreach ($comment['metas'] as &$meta) {
+            $out = @unserialize($meta, ['allowed_classes' => false]);
+            if ($out !== false) {
+                $meta = $out;
+            }
+        }
+    }
+
+    $post['taxonomy'] = wp_QueryFetchSingle("SELECT term_taxonomy_id FROM wp_term_relationships WHERE object_id=".$post['ID'].";");
+    $post['categories'] = [];
+    foreach ($post['taxonomy'] as &$tax) {
+        if (array_key_exists($tax, $term_type_taxonomies['category'])) {
+            $post['categories'][] = $term_type_taxonomies['category'][$tax];
+        }
+    }
+}
+$user['pages'] = wp_QueryFetch("SELECT * FROM wp_posts WHERE post_type='page' AND post_author=$id;");
+foreach ($user['pages'] as &$page) {
+    $page['metas'] = wp_QueryFetchPair("SELECT meta_key, meta_value FROM wp_postmeta WHERE post_id=".$page['ID'].";");
+    foreach ($page['metas'] as &$meta) {
+        $out = @unserialize($meta, ['allowed_classes' => false]);
+        if ($out !== false) {
+            $meta = $out;
+        }
+    }
+
+    $page['comments'] = wp_QueryFetch("SELECT * FROM wp_comments WHERE comment_post_ID=".$page['ID'].";");
+    foreach ($page['comments'] as &$comment) {
+        $comment['metas'] = wp_QueryFetchPair("SELECT meta_key, meta_value FROM wp_commentmeta WHERE comment_id=".$comment['comment_ID'].";");
+        foreach ($comment['metas'] as &$meta) {
+            $out = @unserialize($meta, ['allowed_classes' => false]);
+            if ($out !== false) {
+                $meta = $out;
+            }
+        }
+    }
+
+    $page['taxonomy'] = wp_QueryFetchSingle("SELECT term_taxonomy_id FROM wp_term_relationships WHERE object_id=".$page['ID'].";");
+}
+$user['attachments'] = wp_QueryFetch("SELECT * FROM wp_posts WHERE post_type='attachment' AND post_author=$id;");
+foreach ($user['attachments'] as &$attachment) {
+    $attachment['metas'] = wp_QueryFetchPair("SELECT meta_key, meta_value FROM wp_postmeta WHERE post_id=".$attachment['ID'].";");
+    foreach ($attachment['metas'] as &$meta) {
+        $out = @unserialize($meta, ['allowed_classes' => false]);
+        if ($out !== false) {
+            $meta = $out;
+        }
+    }
+
+    $attachment['comments'] = wp_QueryFetch("SELECT * FROM wp_comments WHERE comment_post_ID=".$attachment['ID'].";");
+    foreach ($attachment['comments'] as &$comment) {
+        $comment['metas'] = wp_QueryFetchPair("SELECT meta_key, meta_value FROM wp_commentmeta WHERE comment_id=".$comment['comment_ID'].";");
+        foreach ($comment['metas'] as &$meta) {
+            $out = @unserialize($meta, ['allowed_classes' => false]);
+            if ($out !== false) {
+                $meta = $out;
+            }
+        }
+    }
+
+    $attachment['taxonomy'] = wp_QueryFetchSingle("SELECT term_taxonomy_id FROM wp_term_relationships WHERE object_id=".$attachment['ID'].";");
+}
+
+
+$simplemap = wp_QueryFetch("SELECT lat AS latitude, lon AS longitude FROM wp_simplemap WHERE id=$id;");
+if ($simplemap) {
+    $user['simplemap'] = $simplemap;
+}
+
+$user['post_likes'] = wp_QueryFetchPair("SELECT post_id, `time` FROM wp_ilikethis_votes WHERE user_id=$id;");
+$user['post_like_ips'] = wp_QueryFetchPair("SELECT ip, count(post_id) FROM wp_ilikethis_votes WHERE user_id=$id GROUP BY ip;");
+
+$user['trophies'] = wp_QueryFetch("SELECT * FROM wp_compo_trophy WHERE to_uid=$id;");
+
+$user['compo_games'] = [];
+foreach ($user['posts'] as &$post) {
+    if ( in_array($post['ID'], $final['taxonomy']['objects']) ) {
+        $post['compo_ratings'] = null;
+        foreach ($post['categories'] as &$cat) {
+            $post['compo_ratings'] =  wp_QueryFetch("SELECT * FROM wp_compo_rate WHERE cid=".$cat['term_id']." AND to_uid=".$user['ID'].";");
+
+            foreach ($post['compo_ratings'] as &$rating) {
+                $out = @unserialize($rating['data'], ['allowed_classes' => false]);
+                if ($out !== false) {
+                    $rating['data'] = $out;
+                }
+            }
+        }
+
+        $user['compo_games'][] = $post;
+
+        // TODO: confirm the game belongs to a valid "game" category
+    }
+}
+
+$user['compo2_games'] = wp_QueryFetch("SELECT * FROM c2_entry WHERE uid=$id;");
+foreach ($user['compo2_games'] as &$game) {
+    $out = @unserialize($game['links'], ['allowed_classes' => false]);
+    if ($out !== false) {
+        $game['links'] = $out;
+    }
+
+    $out = @unserialize($game['data'], ['allowed_classes' => false]);
+    if ($out !== false) {
+        $game['data'] = $out;
+    }
+
+    $out = @unserialize($game['results'], ['allowed_classes' => false]);
+    if ($out !== false) {
+        $game['results'] = $out;
+    }
+
+    $out = @unserialize($game['shots'], ['allowed_classes' => false]);
+    if ($out !== false) {
+        $game['shots'] = $out;
+    }
+
+    $out = @unserialize($game['get_user'], ['allowed_classes' => false]);
+    if ($out !== false) {
+        $game['get_user'] = $out;
+    }
+
+    $out = @unserialize($game['settings'], ['allowed_classes' => false]);
+    if ($out !== false) {
+        $game['settings'] = $out;
+    }
+
+    $game['comments'] = wp_QueryFetch("SELECT * FROM c2_comments WHERE cid=".$game['cid']." AND to_uid=".$user['ID'].";");
+    foreach ($game['comments'] as &$comment) {
+        $out = @unserialize($comment['get_user'], ['allowed_classes' => false]);
+        if ($out !== false) {
+            $comment['get_user'] = $out;
+        }
+    }
+
+    $game['ratings'] = wp_QueryFetch("SELECT * FROM c2_rate WHERE cid=".$game['cid']." AND to_uid=".$user['ID'].";");
+    foreach ($game['ratings'] as &$rating) {
+        $out = @unserialize($rating['data'], ['allowed_classes' => false]);
+        if ($out !== false) {
+            $rating['data'] = $out;
+        }
+    }
+}
+
+//$output = $options;
+//$output = ['expenses' => $expenses, 'donations' => $donations];
+//$output = $term_types['category'];
+//$output = $final;
+$output = $user;
+
+echo(json_encode($output, JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES));
