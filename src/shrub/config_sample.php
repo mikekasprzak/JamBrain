@@ -27,6 +27,12 @@ const SH_TABLE_PREFIX = 'sh_';
 const SH_SEARCHDB_HOST = '127.0.0.1';
 const SH_SEARCHDB_PORT = 9306;
 
+// Legacy Database Config //
+const WP_DB_HOST = 'localhost';
+const WP_DB_NAME = 'legacy';
+const WP_DB_login = 'root';
+const WP_DB_PASSWORD = 'root';
+
 // Memcached Config //
 //const SH_MEMCACHED_HOST = 'localhost';
 //const SH_MEMCACHED_PORT = 11211;
