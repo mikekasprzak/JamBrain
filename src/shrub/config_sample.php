@@ -53,6 +53,7 @@ const SH_STATIC_DIR = '/public-static';
 // Access Permission Whitelist (Can be arrays on PHP 5.6+) //
 const SH_ACCESS_DATA = "192.168.56.1";
 
+const CREATE_ACCOUNT = true;
 //const SECURE_LOGIN_ONLY = true;
 
 // EXTERNAL APIs //
