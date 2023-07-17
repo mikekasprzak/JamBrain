@@ -30,6 +30,8 @@ function AreYouSure() {
 	}
 }
 
+$events = node_GetByType("event");
+
 $parent = 9;	// Ludum Dare Group "ludum-dare", under "events"
 $author = 11;	// Mike
 
